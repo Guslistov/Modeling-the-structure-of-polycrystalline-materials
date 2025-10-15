@@ -1,20 +1,20 @@
 # Modeling-the-structure-of-polycrystalline-materials
 
 # Требования к установленным программам:
-Python 3.9+ с pip
-Node.js 16+
-Visual Studio Code (опционально)
-Anaconda Jupyter (опционально)
+- Python 3.9+ с pip
+- Node.js 16+
+- Visual Studio Code (опционально)
+- Anaconda Jupyter (опционально)
 # Зависимости:
-fastapi==0.115.12
-uvicorn==0.34.2
-python-multipart==0.0.20
-pillow==11.2.1
-numpy==1.26.4
-torch==2.7.0
-torchvision==0.22.0
-pandas==2.2.3
-orix==0.13.0
+- fastapi==0.115.12
+- uvicorn==0.34.2
+- python-multipart==0.0.20
+- pillow==11.2.1
+- numpy==1.26.4
+- torch==2.7.0
+- torchvision==0.22.0
+- pandas==2.2.3
+- orix==0.13.0
 # Шаги по установки и запуску проекта:
 1.	Создать и активировать виртуальное окружение venv: 
 python -m venv venv
