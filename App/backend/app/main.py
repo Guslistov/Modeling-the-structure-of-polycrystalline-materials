@@ -100,11 +100,10 @@ async def process_reconstraction(data: dict = Body(...)):
     try:
         window_padding = data.get("window_padding")
         original_filename = data.get("file_name")
-        step_y = data.get("step_y")
-        step_x = data.get("step_x")
+        size_y = data.get("step_y")
+        size_x = data.get("step_x")
         resized = data.get("resized") 
         model_name = data.get("model_name")
-        y_value = int(step_y / step_x)
 
         if not original_filename:
             raise HTTPException(status_code=400, detail="File name required")
@@ -123,7 +122,7 @@ async def process_reconstraction(data: dict = Body(...)):
         
         # Обрабатываем и сохраняем файл с префиксом processed_
         model_full_path = MODEL_DIR / model_name
-        await process_euler_reconstraction(original_full_path, processed_full_path, model_full_path, window_padding, y_value, resized)
+        await process_euler_reconstraction(original_full_path, processed_full_path, model_full_path, window_padding, size_y, size_x, resized)
 
         await process_eulers(processed_full_path, processed_full_path_image)
         

@@ -25,13 +25,13 @@ async def process_eulers(in_path, out_path):
 #------------------------------------------------------------------------------------------------
 
 #---------------------------------Функция реконструкции углов эйлера------------------------------------
-async def process_euler_reconstraction(in_path, out_path, model_path, window_padding, y_step = 4, resized = False):
+async def process_euler_reconstraction(in_path, out_path, model_path, window_padding, y_step = 4, x_step = 4, resized = False):
 
     generator, device = initialize_model(model_path)
     
     # load file and convert to tensor
     if (resized):
-        df, size_x, size_y, step_x, step_y = get_full_interlaced(in_path, y_step)
+        df, size_x, size_y, step_x, step_y = get_full_interlaced(in_path, y_step, x_step)
     else:
         df, size_x, size_y, step_x, step_y = load_EBSD_file(in_path)
     image, mask = convert_EBSD_to_tensor(df, size_x, size_y)
@@ -106,18 +106,43 @@ def initialize_model(path_to_model):
     return generator, device
 
 def generate(h,w,stride,feather,window_size,generator,device, image_inpainted,mask):
-    for i in range(0, h, stride):
-        for j in range(0, w, stride):
+    # Определяем целевой размер (256x256)
+    target_size = 256
+    
+    # Если изображение меньше целевого размера, добавляем паддинг
+    if h < target_size or w < target_size:
+        # Вычисляем необходимое дополнение
+        pad_h = max(0, target_size - h)
+        pad_w = max(0, target_size - w)
+        
+        # Создаем тензоры с паддингом
+        image_padded = torch.zeros(3, h + pad_h, w + pad_w, device=device)
+        mask_padded = torch.zeros(1, h + pad_h, w + pad_w, device=device)
+        
+        # Копируем исходные данные в левый верхний угол
+        image_padded[:, :h, :w] = image_inpainted
+        mask_padded[:, :h, :w] = mask
+        
+        # Обновляем переменные для работы с дополненным изображением
+        image_inpainted = image_padded
+        mask = mask_padded
+        h_padded, w_padded = h + pad_h, w + pad_w
+    else:
+        h_padded, w_padded = h, w
+    
+    # Используем дополненные размеры в цикле обработки
+    for i in range(0, h_padded, stride):
+        for j in range(0, w_padded, stride):
             # Get current window coordinates
             i_end = i + window_size
             j_end = j + window_size
 
-            if i_end > h:
-                i_end = h
-                i = h - window_size
-            if j_end > w:
-                j_end = w
-                j = w - window_size
+            if i_end > h_padded:
+                i_end = h_padded
+                i = h_padded - window_size
+            if j_end > w_padded:
+                j_end = w_padded
+                j = w_padded - window_size
 
             # Extract window
             image_window = image_inpainted[:, i:i_end, j:j_end]
@@ -143,14 +168,21 @@ def generate(h,w,stride,feather,window_size,generator,device, image_inpainted,ma
             weight = torch.ones(1, 1, *image_window.shape[1:], device=device)
 
             # Add to output
-            h_start, h_end = i, min(i + window_size, h)
-            w_start, w_end = j, min(j + window_size, w)
+            h_start, h_end = i, min(i + window_size, h_padded)
+            w_start, w_end = j, min(j + window_size, w_padded)
             
             image_inpainted[:, h_start:h_end, w_start:w_end] = (
                 image_inpainted[:, h_start:h_end, w_start:w_end] * (1 - mask_window) + 
                 window_result[0, :, :h_end-h_start, :w_end-w_start] * mask_window
             )
             mask[:, i:i_end, j:j_end] = 0
+    
+    # Обрезаем результат до исходного размера
+    if h < target_size or w < target_size:
+        image_inpainted = image_inpainted[:, :h, :w]
+        mask = mask[:, :h, :w]
+    
+    return image_inpainted, mask
 
 def load_EBSD_file(path_to_file):
     size_x = 0
@@ -158,28 +190,86 @@ def load_EBSD_file(path_to_file):
     step_x = 0
     step_y = 0
 
-    with open(path_to_file, 'r') as f:
+    # Определяем тип файла по расширению
+    try:
+        file_extension = path_to_file.lower().split('.')[-1]
+    except AttributeError:
+        # Если path_to_file не строка или нет метода lower()
+        file_extension = str(path_to_file).split('.')[-1].lower()
+    except IndexError:
+        # Если нет расширения (файл без точки)
+        print(f"Предупреждение: не удалось определить расширение файла {path_to_file}")
+        file_extension = 'txt'  # значение по умолчанию
+    
+    with open(path_to_file, 'r',encoding="cp1251") as f:
         first_line = f.readline().strip()
         isFragment = (first_line == "FRAGMENT")
+    
     if isFragment: # Фрагменты EBSD (из датасета)
-        df = pd.read_csv(path_to_file, sep='\t', skiprows=3)
+        if file_extension in ['ctf', 'txt']:
+            df = pd.read_csv(path_to_file, sep='\t', skiprows=3)
+        elif file_extension == 'xlsx':
+            df = pd.read_excel(path_to_file, skiprows=3)
+        else:
+            raise ValueError(f"Неподдерживаемый формат файла: {file_extension}")
+            
         with open(path_to_file, 'r') as f:
             f.readline()
             size_x = int(f.readline())
             size_y = int(f.readline())
     else: # Файлы EBSD
-        with open(path_to_file, 'r') as f:
-            line_number = 0
-            for line in f:
-                line_number += 1
-                if line.strip().startswith("XCells"):
-                    size_x = int(line.strip().split()[1])
-                if line.strip().startswith("YCells"):
-                    size_y = int(line.strip().split()[1])
-                if all(col in line for col in ["Euler1", "Euler2", "Euler3"]):
-                    header_line_number = line_number
+        if file_extension in ['ctf', 'txt']:
+            with open(path_to_file, 'r') as f:
+                line_number = 0
+                for line in f:
+                    line_number += 1
+                    if line.strip().startswith("XCells"):
+                        size_x = int(line.strip().split()[1])
+                    if line.strip().startswith("YCells"):
+                        size_y = int(line.strip().split()[1])
+                    if all(col in line for col in ["Euler1", "Euler2", "Euler3"]):
+                        header_line_number = line_number
+                        break
+            df = pd.read_csv(path_to_file, sep='\t', skiprows=header_line_number-1)
+        elif file_extension == 'xlsx':
+            # Для xlsx файлов ищем заголовок и метаданные по-другому
+            temp_df = pd.read_excel(path_to_file, header=None)
+            
+            # Ищем строки с XCells и YCells
+            for idx, row in temp_df.iterrows():
+                if row.astype(str).str.contains('XCells').any():
+                    cell_value = row.astype(str)
+                    xcells_line = cell_value[cell_value.str.contains('XCells')].iloc[0]
+                    size_x = int(xcells_line.split()[1])
+                if row.astype(str).str.contains('YCells').any():
+                    cell_value = row.astype(str)
+                    ycells_line = cell_value[cell_value.str.contains('YCells')].iloc[0]
+                    size_y = int(ycells_line.split()[1])
+                # Ищем строку с заголовком
+                if all(col in row.astype(str).values for col in ["Euler1", "Euler2", "Euler3"]):
+                    header_line_number = idx
                     break
-        df = pd.read_csv(path_to_file, sep='\t', skiprows=header_line_number-1)
+            
+            df = pd.read_excel(path_to_file, skiprows=header_line_number)
+        else:
+            raise ValueError(f"Неподдерживаемый формат файла: {file_extension}")
+
+    # Переименование столбцов если такие имеются
+    column_rename_map = {}
+    if 'Xpos' in df.columns:
+        column_rename_map['Xpos'] = 'X'
+    if 'Ypos' in df.columns:
+        column_rename_map['Ypos'] = 'Y'
+    if 'Euler1(°)' in df.columns:
+        column_rename_map['Euler1(°)'] = 'Euler1'
+    if 'Euler2(°)' in df.columns:
+        column_rename_map['Euler2(°)'] = 'Euler2'
+    if 'Euler3(°)' in df.columns:
+        column_rename_map['Euler3(°)'] = 'Euler3'
+    
+    if column_rename_map:
+        df = df.rename(columns=column_rename_map)
+        print(f"Переименованы столбцы: {column_rename_map}")
 
     if 'X' in df.columns and 'Y' in df.columns:
         if size_x == 0 or size_y == 0:  
@@ -202,6 +292,7 @@ def load_EBSD_file(path_to_file):
         df['Euler3'] = pd.to_numeric(df['Euler3'].str.replace(',', '.'), errors='coerce')
     except AttributeError:
         print(f"{path_to_file}: Замена запятых на точки не требуется")
+    
     return df, size_x, size_y, step_x, step_y
 
 def convert_EBSD_to_tensor(df, size_x, size_y):
@@ -263,17 +354,20 @@ def get_colors_IPF_Z(euler_angles):
     return torch.tensor(rgb_z, device='cuda')
 
 #---------------------------------Функция подготовки чересстрочных пропусков------------------------------------
-def get_full_interlaced(in_path, y):
+def get_full_interlaced(in_path, y, x):
     df, size_x, size_y, step_x, step_y = load_EBSD_file(in_path)
 
     df = df[['Euler1', 'Euler2', 'Euler3']]
     data = df.values.astype(np.float32)
     image_data = data.reshape(size_y, size_x, 3)
 
+    # Увеличиваем размеры для создания пропусков
     size_y = size_y * y
+    size_x = size_x * x
 
+    # Создаем массив с пропусками по обеим осям
     restored = np.zeros((size_y, size_x, 3), dtype=np.float32)
-    restored[::y, :, :] = image_data
+    restored[::y, ::x, :] = image_data
 
     print(restored.shape)
 
