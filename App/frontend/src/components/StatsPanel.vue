@@ -1,8 +1,8 @@
 <template>
     <div class="stats-panel">
-      <h3>Вывод сообщений</h3>
+      <h3>Сообщения</h3>
       <div v-if="error" class="error-message">{{ error }}</div>
-      <div v-else class="error-message">[...]</div>
+      <div v-else class="error-message">...</div>
     </div>
   </template>
   
@@ -30,7 +30,7 @@
 }
 
 .error-message {
-  color: red;
+  color: rgb(90, 72, 255);
   margin-top: 10px;
   font-size: 16px;
 }

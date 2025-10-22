@@ -91,7 +91,9 @@ const handleFileUpload = async (event) => {
     original_image.value = result.original_image;
     original_file.value = result.original_file;
     emit('file-uploaded', result, props.activeTab);
-    processedImage.value = null; // Сбрасываем предыдущий результат
+    processedImage.value = null;
+    error.value = 'Файл загружен без ошибок';
+    emit('new-message', error, props.activeTab);
   } catch (err) {
     error.value = 'Ошибка при загрузке файла';
     emit('new-message', error, props.activeTab);
@@ -106,7 +108,7 @@ const createIPFMap = async () => {
   }
   
   isProcessing.value = true;
-  error.value = null;
+  error.value = "функция построения IPF-карты запущена...";
   emit('new-message', error, props.activeTab);
 
   let type = 2
@@ -129,6 +131,8 @@ const createIPFMap = async () => {
     processedImage.value = result.processed_image;
     downloadFileName.value = fileName.value.split('.').slice(0, -1).join('.') + "_IPF-" + axis.value + ".png";
     emit('processing-complete', result, props.activeTab);
+    error.value = null;
+    emit('new-message', error, props.activeTab);
   } catch (err) {
     error.value = err.message || 'Ошибка при обработке файла';
     emit('new-message', error, props.activeTab);

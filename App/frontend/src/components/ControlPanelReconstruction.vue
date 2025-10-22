@@ -106,6 +106,8 @@ const handleFileUpload = async (event) => {
     original_file.value = result.original_file;
     emit('file-uploaded', result, props.activeTab);
     processedImage.value = null;
+    error.value = 'Файл загружен без ошибок';
+    emit('new-message', error, props.activeTab);
   } catch (err) {
     error.value = 'Ошибка при загрузке файла';
     emit('new-message', error, props.activeTab);
@@ -120,7 +122,7 @@ const start_process_reconstraction = async () => {
   }
   
   isProcessing.value = true;
-  error.value = null;
+  error.value = "функция реконструкции углов Эйлера запущена...";
   emit('new-message', error, props.activeTab);
 
   try {
@@ -136,12 +138,16 @@ const start_process_reconstraction = async () => {
     processedImage.value = result.processed_image;
     downloadFileName.value = fileName.value.split('.').slice(0, -1).join('.') + "_new" + ".ctf";
     emit('processing-complete', result, props.activeTab);
+    error.value = null;
+    emit('new-message', error, props.activeTab);
   } catch (err) {
     error.value = err.message || 'Ошибка при обработке файла';
     emit('new-message', error, props.activeTab);
     console.error('Processing error details:', err.response?.data || err);
   } finally {
     isProcessing.value = false;
+    
+    
   }
 };
 

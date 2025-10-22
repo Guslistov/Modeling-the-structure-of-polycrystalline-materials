@@ -26,7 +26,7 @@
     </div>
 
     <div class="control-row">
-      <label class="control-label">XStep:</label>
+      <label class="control-label">XSize:</label>
       <input 
         type="number" 
         v-model.number="XStep" 
@@ -36,7 +36,7 @@
     </div>
 
     <div class="control-row">
-      <label class="control-label">YStep:</label>
+      <label class="control-label">YSize:</label>
       <input 
         type="number" 
         v-model.number="YStep" 
@@ -94,8 +94,8 @@ const downloadFileName = ref(null);
 const error = ref(null);
 const shiftStep = ref(64);
 
-const XStep = ref(6);
-const YStep = ref(6);
+const XStep = ref(2);
+const YStep = ref(2);
 
 const isProcessing = ref(false);
 
@@ -126,10 +126,12 @@ const handleFileUpload = async (event) => {
     const result = await props.onFileUpload(file);
     original_image.value = result.original_image;
     original_file.value = result.original_file;
-    XStep.value = result.step_x;
-    YStep.value = result.step_y;
+    XStep.value = 2;//result.step_x;
+    YStep.value = 2;//result.step_y;
     emit('file-uploaded', result, props.activeTab);
     processedImage.value = null;
+    error.value = 'Файл загружен без ошибок';
+    emit('new-message', error, props.activeTab);
   } catch (err) {
     error.value = 'Ошибка при загрузке файла';
     emit('new-message', error, props.activeTab);
@@ -144,7 +146,7 @@ const start_process_resized = async () => {
   }
   
   isProcessing.value = true;
-  error.value = null;
+  error.value = "функция заполнения чересстрочных пропусков запущена...";
   emit('new-message', error, props.activeTab);
 
   try {
@@ -160,6 +162,8 @@ const start_process_resized = async () => {
     processedImage.value = result.processed_image;
     downloadFileName.value = fileName.value.split('.').slice(0, -1).join('.') + "_new" + ".ctf";
     emit('processing-complete', result, props.activeTab);
+    error.value = null;
+    emit('new-message', error, props.activeTab);
   } catch (err) {
     error.value = err.message || 'Ошибка при обработке файла';
     emit('new-message', error, props.activeTab);

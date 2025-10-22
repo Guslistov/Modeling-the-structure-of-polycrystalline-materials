@@ -89,9 +89,9 @@ const processedFiles = ref([
 const errorMessages = ref([null, null, null]); // Ошибки по вкладкам
 
 const uploadFile = async (file) => {
-  if (!file.name.toLowerCase().endsWith('.ctf')) {
-    throw new Error('Пожалуйста, выберите EBSD с расширением .ctf');
-  } 
+  //if (!file.name.toLowerCase().endsWith('.ctf') || !file.name.toLowerCase().endsWith('.xlsx')) {
+  //  throw new Error('Пожалуйста, выберите EBSD с расширением .ctf или .xlsx');
+ //}
   const formData = new FormData();
   formData.append('file', file);
   
